@@ -674,7 +674,7 @@ class Subtitle(BasisModell):
         transcript = re.sub("</i>", "*", transcript)
         transcript = re.sub("&amp;", "&", transcript)
         if save:
-            filename = self.talk.slug+"." + self.language.lang_amara_short + ".transcripts"
+            filename = self.talk.slug+"." + self.language.lang_amara_short + ".transcript"
             folder = "./downloads/subtitle_transcript_files/"
             # Save File in ./downloads
             file = open(folder+filename,mode = "w",encoding = "utf-8")
@@ -695,7 +695,7 @@ class Subtitle(BasisModell):
             return None
         sbv_file =  r.text
         if save:
-            filename = self.talk.slug+"." + self.language.lang_amara_short + ".transcript"
+            filename = self.talk.slug+"." + self.language.lang_amara_short + ".sbv"
             folder = "./downloads/subtitle_sbv_files/"
             # Save File in ./downloads
             file = open(folder+filename,mode = "w",encoding = "utf-8")
@@ -722,7 +722,7 @@ class Subtitle(BasisModell):
         srt_file = re.sub("</i>", "*", srt_file)
         srt_file = re.sub("&amp;", "&", srt_file)
         if save:
-            filename = self.talk.slug+"." + self.language.lang_amara_short + ".transcript"
+            filename = self.talk.slug+"." + self.language.lang_amara_short + ".srt"
             folder = "./downloads/subtitle_srt_files/"
             # Save File in ./downloads
             file = open(folder+filename,mode = "w",encoding = "utf-8")
