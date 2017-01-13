@@ -306,6 +306,9 @@ class Talk(BasisModell):
     recalculate_speakers_statistics = models.BooleanField(default = False)
     n_most_frequent_words = models.TextField(default = "{}")    # n most common words as json string
     n_most_frequent_words_speakers = models.TextField(default = "{}")    # n most common words as json string
+    amara_activity_last_checked = models.DateTimeField(default = datetime.min, blank = True)        # Light check, only amara activity
+    amara_update_interval = models.TimeField(default = "00:10", blank = True) # How often is activity checked?
+    amara_complete_update_last_chacked = models.DateTimeField(default = datetime.min, blank = True) # Everything checked, activity and data of every single subtitle
 
     # Recalculate statistics data over the whole talk
     @transaction.atomic
@@ -510,6 +513,15 @@ class Talk(BasisModell):
         # Call super delete function
         super(Talk, self).delete(*args, **kwargs) 
 
+    # Check activity on amara
+    @transaction.atomic
+    def check_activity_on_amara(self, force = False):
+        pass
+
+    # Check amara video-data
+    def check_amara_video_data(self, force = False):
+        pass
+
 
 # States for every subtitle like "complete" or "needs sync"
 class States(BasisModell):
@@ -573,11 +585,11 @@ class Subtitle(BasisModell):
     @property
     def language_short(self):
         # Workaround because of Klingon / Orignal
-        lang = self.language.lang_short_srt
         return self.language.lang_short_srt
 
     # Sync Subtitle File to the cdn
-    def sync_to_ftp(self):
+    def sync_to_ftp(self, force = False):
+        # Only if not blacklisted and complete!
         pass
 
     # Remove Subtitle Files from the cdn
@@ -586,7 +598,8 @@ class Subtitle(BasisModell):
 
     # Sync Subtitle File to the media frontend
     # Only use _after_ file has been synced to the cdn
-    def sync_to_media(self):
+    def sync_to_media(self, force = False):
+        # Only if not blacklisted and complete!
         pass
 
     # Remove Subtitle File from the media frontend
@@ -595,11 +608,82 @@ class Subtitle(BasisModell):
         pass
 
     # Sync Subtitle File to YT
-    def sync_to_YT(self):
+    def sync_to_YT(self, force = False):
+        # Only if not blacklisted and complete
         pass
 
     # Remove Subtitle File from YT
     def remove_from_YT(self):
+        pass
+
+    # Set the subtitle complete
+    def set_complete(self, was_already_complete = False):
+        # Set all timestamps and status depending if it is a translation or not
+        # Set all flags for sync
+        # Set tweet flag if not was_already_complete
+        pass
+
+    # Reset subtitle if it was complete but it is not any more
+    def reset_from_complete(self):
+        pass
+
+    # Set to autotiming in progress
+    def set_to_autotiming_in_progress(self):
+        pass
+
+    # Tweet a completed Subtitle
+    def tweet_complete(self):
+        # Only if all (only cdn) sync-flags are gone and tweet flag is set
+        pass
+
+    # Tweet a Subtitle which is now ready for quality control
+    def tweet_needs_quality_control(self):
+        # Only if tweet_autosync_done is set
+        pass
+
+    # Return the transcript file with amara fails fixed
+    @property
+    def as_transcript(self):
+        import re
+        import requests
+        # Create the url for the srt File
+        # Only the srt-Version of all possible fileformats includes the "*" and "&"
+        url = "https://www.amara.org/api2/partners/videos/" + self.talk.amara_key +"/languages/" + self.language.lang_amara_short + "/subtitles/?format=srt"
+        # If this fails for any reason return None
+        try:
+        # No header necessary, this works without identification
+            r = requests.get(url)
+        except:
+            return None
+        srt_file =  r.text
+        # Split the file at every double linebreak
+        srt_file = srt_file.split("\r\n\r\n")
+        transcript = ""
+        for any_block in srt_file:
+            # Split every textblock in its lines
+            any_block = any_block.split("\r\n")
+            line_counter = 2
+            while line_counter < len(any_block):
+                # Ignore empty subtitle lines
+                if any_block[line_counter] != "":
+                    transcript += any_block[line_counter] + "\n"
+                line_counter += 1
+            # Double line break after a complete block
+            transcript += "\n"
+        # Fix some amara fails
+        transcript = re.sub("<i>", "*", transcript)
+        transcript = re.sub("</i>", "*", transcript)
+        transcript = re.sub("&amp;", "&", transcript)
+        return transcript
+
+    # Return the sbv_file with fixes
+    @property
+    def as_sbv(self):
+        pass
+
+    # Return the srt_file with fixes
+    @property
+    def as_srt(self):
         pass
 
 
