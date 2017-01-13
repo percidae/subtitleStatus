@@ -576,6 +576,32 @@ class Subtitle(BasisModell):
         lang = self.language.lang_short_srt
         return self.language.lang_short_srt
 
+    # Sync Subtitle File to the cdn
+    def sync_to_ftp(self):
+        pass
+
+    # Remove Subtitle Files from the cdn
+    def remove_from_ftp(self):
+        pass
+
+    # Sync Subtitle File to the media frontend
+    # Only use _after_ file has been synced to the cdn
+    def sync_to_media(self):
+        pass
+
+    # Remove Subtitle File from the media frontend
+    # Use _before_ file is removed from the cdn
+    def remove_from_media(self):
+        pass
+
+    # Sync Subtitle File to YT
+    def sync_to_YT(self):
+        pass
+
+    # Remove Subtitle File from YT
+    def remove_from_YT(self):
+        pass
+
 
 # Links from the Fahrplan
 class Links(BasisModell):
