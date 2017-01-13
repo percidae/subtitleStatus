@@ -589,51 +589,158 @@ class Subtitle(BasisModell):
 
     # Sync Subtitle File to the cdn
     def sync_to_ftp(self, force = False):
-        # Only if not blacklisted and complete!
-        pass
+        # Only if not blacklisted and complete
+        if self.force or (not self.blacklisted and self.complete):
+            # Sync file into the cdn..
+            self.needs_sync_to_ftp = False
+            self.save()
+            return True
+        elif self.blacklisted:
+            return None
+        elif not self.complete:
+            return False
 
     # Remove Subtitle Files from the cdn
-    def remove_from_ftp(self):
-        pass
+    # First remove from media
+    def remove_from_ftp(self, force = False):
+        if force or not self.complete:
+            # Check if it is already gone from media
+            if self.needs_removal_from_media:
+                self.remove_from_media()
+            # Remove file from cdn..
+            self.needs_removal_from_ftp = False
+            self.save()
+            return True
+        if self.complete:
+            return False
 
     # Sync Subtitle File to the media frontend
     # Only use _after_ file has been synced to the cdn
     def sync_to_media(self, force = False):
-        # Only if not blacklisted and complete!
-        pass
+        # Only if not blacklisted and complete
+        if self.force or (not self.blacklisted and self.complete):
+            # Only if the file is already in the cdn
+            if self.needs_sync_to_ftp:
+                self.sync_to_ftp()
+            # do upload stuff
+            self.needs_sync_to_media = False
+            self.save()
+            return True
+        elif self.blacklisted:
+            return None
+        elif not self.complete:
+            return False
 
     # Remove Subtitle File from the media frontend
     # Use _before_ file is removed from the cdn
-    def remove_from_media(self):
-        pass
+    def remove_from_media(self), force = False:
+        if force or not self.complete:
+            # Remove file from media frontend..
+            self.needs_removal_from_media = False
+            self.save()
+            return True
+        if self.complete:
+            return False
 
     # Sync Subtitle File to YT
     def sync_to_YT(self, force = False):
         # Only if not blacklisted and complete
-        pass
+        if self.force or (not self.blacklisted and self.complete):
+            # Upload file to Youtube and make visible
+            self.needs_sync_to_YT = False
+            self.save()
+            return True
+        elif self.blacklisted:
+            return None
+        elif not self.complete:
+            return False
 
     # Remove Subtitle File from YT
-    def remove_from_YT(self):
-        pass
+    def remove_from_YT(self force = False):
+        if force or not self.complete:
+            # Remove file from YT..
+            self.needs_removal_from_YT = False
+            self.save()
+            return True
+        if self.complete:
+            return False        
+
+    # Set all flags for a sync to cdn, media frontend, YT ...
+    def set_all_sync_flags(self, save = False):
+        self.needs_sync_to_ftp = True
+        self.needs_sync_to_media = True
+        self.needs_sync_to_YT = True
+        if save:
+            self.save()
+
+    # Set all flags for a removal from the cdn, media frontend, YT...
+    def set_all_removal_flags(self, save = False):
+        self.needs_removal_from_ftp = True
+        self.needs_removal_from_media = True
+        self.needs_removal_from_YT = True
+        if save:
+            self.save()
 
     # Set the subtitle complete
+    @transaction.atomic
     def set_complete(self, was_already_complete = False):
-        # Set all timestamps and status depending if it is a translation or not
-        # Set all flags for sync
-        # Set tweet flag if not was_already_complete
-        pass
+        if self.is_original_lang:
+            self.time_processed_transcribing = self.talk.video_duration
+            self.time_processed_syncing = self.talk.video_duration
+            self.time_quality_check_done = self.talk.video_duration
+            self.state_id = 8
+        else:
+            self.time_processed_translating = self.talk.video_duration
+            self.state_id = 12
+        # Only tweet if the file was not already complete
+        if not was_already_complete:
+            self.tweet = True
+        self.blocked = False
+        self.set_all_sync_flags()
+        self.needs_automatic_syncing = False
+        self.save()
 
     # Reset subtitle if it was complete but it is not any more
+    @transaction.atomic
     def reset_from_complete(self):
-        pass
+        self.time_processed_transcribing = "00:00:00"
+        self.time_processed_syncing = "00:00:00"
+        self.time_quality_check_done = "00:00:00"
+        self.time_processed_translating = "00:00:00"
+        if self.is_original_lang:
+            self.state_id = 2
+        else:
+            self.state_id = 11
+        self.set_all_removal_flags()
+        self.needs_automatic_syncing = False
+        self.blocked = False
+        self.save()
 
     # Set to autotiming in progress
     def set_to_autotiming_in_progress(self):
-        pass
+        # Stop if the subtitle is not the original language
+        if not self.is_original_lang:
+            return None
+        needs_save = False
+        if self.time_processed_transcribing != self.talk.video_duration:
+            self.time_processed_transcribing = self.talk.video_duration
+            needs_save = True
+        if self.blocked == False:
+            self.blocked = True
+            needs_save = True
+        if self.needs_automatic_syncing == False:
+            self.needs_automatic_syncing = True
+            needs_save = True
+        if self.state_id != 4:
+            self.state_id = 4
+            needs_save = True
+        if needs_save:
+            self.save()
+        return needs_save
 
     # Tweet a completed Subtitle
     def tweet_complete(self):
-        # Only if all (only cdn) sync-flags are gone and tweet flag is set
+        # Only if all (only cdn?) sync-flags are gone and tweet flag is set
         pass
 
     # Tweet a Subtitle which is now ready for quality control
