@@ -679,12 +679,38 @@ class Subtitle(BasisModell):
     # Return the sbv_file with fixes
     @property
     def as_sbv(self):
-        pass
+        import requests
+        # Create the url for the sbv File
+        url = "https://www.amara.org/api2/partners/videos/" + self.talk.amara_key +"/languages/" + self.language.lang_amara_short + "/subtitles/?format=sbv"
+        # If this fails for any reason return None
+        try:
+        # No header necessary, this works without identification
+            r = requests.get(url)
+        except:
+            return None
+        sbv_file =  r.text         
+        return sbv_file
 
     # Return the srt_file with fixes
     @property
     def as_srt(self):
-        pass
+        import re
+        import requests
+        # Create the url for the srt File
+        # Only the srt-Version of all possible fileformats includes the "*" and "&"
+        url = "https://www.amara.org/api2/partners/videos/" + self.talk.amara_key +"/languages/" + self.language.lang_amara_short + "/subtitles/?format=srt"
+        # If this fails for any reason return None
+        try:
+        # No header necessary, this works without identification
+            r = requests.get(url)
+        except:
+            return None
+        srt_file =  r.text
+        # Fix some amara fails
+        srt_file = re.sub("<i>", "*", srt_file)
+        srt_file = re.sub("</i>", "*", srt_file)
+        srt_file = re.sub("&amp;", "&", srt_file)
+        return srt_file
 
 
 # Links from the Fahrplan
