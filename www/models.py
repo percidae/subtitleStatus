@@ -676,7 +676,7 @@ class Subtitle(BasisModell):
         transcript = re.sub("&amp;", "&", transcript)
         return transcript
 
-    # Return the sbv_file with fixes
+    # Return the sbv_file with fixes (no fixes necessary, but "*" get lost)
     @property
     def as_sbv(self):
         import requests
