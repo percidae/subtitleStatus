@@ -642,8 +642,7 @@ class Subtitle(BasisModell):
         pass
 
     # Return the transcript file with amara fails fixed
-    @property
-    def as_transcript(self):
+    def as_transcript(self, save = False):
         import re
         import requests
         # Create the url for the srt File
@@ -674,11 +673,17 @@ class Subtitle(BasisModell):
         transcript = re.sub("<i>", "*", transcript)
         transcript = re.sub("</i>", "*", transcript)
         transcript = re.sub("&amp;", "&", transcript)
+        if save:
+            filename = self.talk.slug+"." + self.language.lang_amara_short + ".transcripts"
+            folder = "./downloads/subtitle_transcript_files/"
+            # Save File in ./downloads
+            file = open(folder+filename,mode = "w",encoding = "utf-8")
+            file.write(transcript)
+            file.close()
         return transcript
 
     # Return the sbv_file with fixes (no fixes necessary, but "*" get lost)
-    @property
-    def as_sbv(self):
+    def as_sbv(self, save = False):
         import requests
         # Create the url for the sbv File
         url = "https://www.amara.org/api2/partners/videos/" + self.talk.amara_key +"/languages/" + self.language.lang_amara_short + "/subtitles/?format=sbv"
@@ -688,12 +693,18 @@ class Subtitle(BasisModell):
             r = requests.get(url)
         except:
             return None
-        sbv_file =  r.text         
+        sbv_file =  r.text
+        if save:
+            filename = self.talk.slug+"." + self.language.lang_amara_short + ".transcript"
+            folder = "./downloads/subtitle_sbv_files/"
+            # Save File in ./downloads
+            file = open(folder+filename,mode = "w",encoding = "utf-8")
+            file.write(sbv_file)
+            file.close()
         return sbv_file
 
     # Return the srt_file with fixes
-    @property
-    def as_srt(self):
+    def as_srt(self, save = False):
         import re
         import requests
         # Create the url for the srt File
@@ -710,6 +721,13 @@ class Subtitle(BasisModell):
         srt_file = re.sub("<i>", "*", srt_file)
         srt_file = re.sub("</i>", "*", srt_file)
         srt_file = re.sub("&amp;", "&", srt_file)
+        if save:
+            filename = self.talk.slug+"." + self.language.lang_amara_short + ".transcript"
+            folder = "./downloads/subtitle_srt_files/"
+            # Save File in ./downloads
+            file = open(folder+filename,mode = "w",encoding = "utf-8")
+            file.write(srt_file)
+            file.close()
         return srt_file
 
 
