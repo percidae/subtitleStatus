@@ -308,7 +308,7 @@ class Talk(BasisModell):
     n_most_frequent_words_speakers = models.TextField(default = "{}")    # n most common words as json string
     amara_activity_last_checked = models.DateTimeField(default = datetime.min, blank = True)        # Light check, only amara activity
     amara_update_interval = models.TimeField(default = "00:10", blank = True) # How often is activity checked?
-    amara_complete_update_last_chacked = models.DateTimeField(default = datetime.min, blank = True) # Everything checked, activity and data of every single subtitle
+    amara_complete_update_last_checked = models.DateTimeField(default = datetime.min, blank = True) # Everything checked, activity and data of every single subtitle
 
     # Recalculate statistics data over the whole talk
     @transaction.atomic
