@@ -633,7 +633,7 @@ class Subtitle(BasisModell):
 
     # Remove Subtitle File from the media frontend
     # Use _before_ file is removed from the cdn
-    def remove_from_media(self), force = False:
+    def remove_from_media(self, force = False):
         if force or not self.complete:
             # Remove file from media frontend..
             self.needs_removal_from_media = False
@@ -656,7 +656,7 @@ class Subtitle(BasisModell):
             return False
 
     # Remove Subtitle File from YT
-    def remove_from_YT(self force = False):
+    def remove_from_YT(self, force = False):
         if force or not self.complete:
             # Remove file from YT..
             self.needs_removal_from_YT = False
@@ -1102,4 +1102,4 @@ class Talk_Persons(BasisModell):
             return True
         else:
             return False
-0
+
