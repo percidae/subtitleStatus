@@ -45,7 +45,7 @@ class Event(BasisModell):
     speaker_json_link = models.URLField(blank = True, default = "")
     speaker_json_version = models.CharField(max_length = 50, default = "0.0", blank = True)
     blacklisted = models.BooleanField(default = False, blank = True)
-    cdn_subtitles_root_folder = models.URLField(default = "", blank = True)
+    cdn_subtitles_root_folder = models.URLField(default = "", blank = True) # Is used to create the links in the talk webpage for the direct download of the srt file
 
     def isDifferent(id, xmlFile):
         with open("data/eventxml/{}.xml".format(id),'rb') as f:
@@ -89,7 +89,7 @@ class Event(BasisModell):
             else:
                 return True
     
-    # Save Fahrplan xml file with version in the name into ./www/static/
+    # Save Fahrplan xml file with timestamp in the name into ./downloads/fahrplan_files/
     def save_fahrplan_xml_file(self):
         import datetime
         if self.schedule_xml_link[0:1] == "#" or self.schedule_xml_link == "":
@@ -105,7 +105,7 @@ class Event(BasisModell):
         fahrplan = tree.getroot()
         fahrplan_version = fahrplan[0].text
         # Create the filename and save
-        folder = "./www/static/fahrplan_files/"
+        folder = "./downloads/fahrplan_files/"
         filename = self.acronym + " fahrplan version "  + fahrplan_version + " " + "{:%Y-%m-%d_%H:%M:%S}".format(datetime.datetime.now())
         filename = filename.replace("/","_")
         file = open(folder + filename + ".xml", mode = "w", encoding = "utf-8")
@@ -113,7 +113,7 @@ class Event(BasisModell):
         file.close()
         return True
 
-    # Save Speaker json file with version in the name into ./www/static/
+    # Save Speaker json file with timestamp in the name into ./www/static/
     def save_speaker_json_file(self):
         import datetime
         if self.speaker_json_link[0:1] == "#" or self.speaker_json_link == "":
@@ -125,7 +125,7 @@ class Event(BasisModell):
         file_content = result
         result = json.loads(result)
         fahrplan_version = result["schedule_speakers"]["version"]
-        folder = "./www/static/fahrplan_files/"
+        folder = "./downloads/fahrplan_files/"
         filename = self.acronym + " speaker version " + fahrplan_version + " " + "{:%Y-%m-%d_%H:%M:%S}".format(datetime.datetime.now())
         filename = filename.replace("/","_")
         file = open(folder + filename + ".json",mode = "w",encoding = "utf-8")
