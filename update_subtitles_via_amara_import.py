@@ -129,17 +129,14 @@ def set_subtitle_complete(my_subtitle, tweet_about_it = True):
         my_subtitle.state_id = 12 # Translation finished
 
     my_subtitle.save()
+
     # Also reset statistics data
     my_subtitle.talk.recalculate_talk_statistics = True
     my_subtitle.talk.recalculate_speakers_statistics = True
     my_subtitle.talk.save()
     # In the Statistics model
-    my_statistics = Statistics_Raw_Data.objects.filter(talk = my_subtitle.talk)
-    for any_statistics in my_statistics:
-        any_statistics.recalculate_statistics = True
-        any_statistics.save()  
-
-
+    Statistics_Raw_Data.objects.filter(talk = my_subtitle.talk).update(recalculate_statistics = True)
+    
     
 basis_url = "https://amara.org/api/videos/"
 anti_bot_header = {'User-Agent': 'Mozilla/5.0, Opera/9.80 (Windows NT 6.1; WOW64; U; de) Presto/2.10.289 Version/12.01',
