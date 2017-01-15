@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from django.db import models
 from django.db.models import Sum, Q
 from django.core.urlresolvers import reverse
 from django.db import transaction
 from .statistics_helper import *
 import json
+import credentials as cred
 
 # Basic model which provides a field for the creation and the last change timestamp
 class BasisModell(models.Model):
@@ -309,6 +310,7 @@ class Talk(BasisModell):
     amara_activity_last_checked = models.DateTimeField(default = datetime.min, blank = True)        # Light check, only amara activity
     amara_update_interval = models.TimeField(default = "00:10", blank = True) # How often is activity checked?
     amara_complete_update_last_checked = models.DateTimeField(default = datetime.min, blank = True) # Everything checked, activity and data of every single subtitle
+    needs_complete_amara_update = models.BooleanField(default = False)
 
     # Recalculate statistics data over the whole talk
     @transaction.atomic
@@ -511,15 +513,75 @@ class Talk(BasisModell):
         Statistics_Raw_Data.objects.filter(talk = self).delete()
 
         # Call super delete function
-        super(Talk, self).delete(*args, **kwargs) 
+        super(Talk, self).delete(*args, **kwargs)
+
+    # Create a timedelta of the amara_update_interval, for much easier use
+    @property
+    def time_delta(self):
+        return timedelta(seconds = self.amara_update_interval.second,
+            minutes = self.amara_update_interval.minute,
+            hours = self.amara_update_interval.hour,
+            microseconds = self.amara_update_interval.microsecond)
 
     # Check activity on amara
     @transaction.atomic
     def check_activity_on_amara(self, force = False):
-        pass
+        # Take the timestamp for "last executed at" at the beginning of the function
+        start_timestamp = datetime.now(timezone.utc)
+        # Only proceed if forced or if the time delta for another query has passed
+        if force or (start_timestamp > self.amara_activity_last_checked + self.time_delta):
+            import requests
+            # Only check for new versions. New urls or other stuff is not interesting
+            # Check for changes after the last check
+            parameters = {'type': 'version-added',
+                'after': self.amara_activity_last_checked}
+            basis_url = "https://amara.org/api/videos/"
+            url = basis_url + self.amara_key + "/activity/"
+            results = {}
+            # Loop as long as not all new activity datasets have been checked
+            # The json result from amara includes a "next" field which has the url for the next query if not 
+            # all results came with the first query
+            while url != None:
+                r = requests.get(url, headers = cred.AMARA_HEADER, params = parameters)
+                activities = json.loads(r.text)
+                url = activities["meta"]["next"]
+                # Get the results for any language separate
+                for any in activities["objects"]:
+                    language = any["language"]
+                    # Parse the date time string into a datetime object
+                    timestamp = datetime.strptime(any["date"], '%Y-%m-%dT%H:%M:%SZ')
+                    # Amara Timestamps are all in utc, they just don't know yet, so they need to be force told
+                    timestamp = timestamp.replace(tzinfo = timezone.utc)
+                    # Add the new key to the dictionary and only at insert set the timestamp
+                    if language not in results:
+                        results[language] = timestamp
+                    # Keep the newest timestamp over all api queries
+                    elif results[language] < timestamp:
+                        results[language] = timestamp
+            # check if subtitles are present and need new data..
+            for any_language in results.keys():
+                my_subtitles = Subtitle.objects.filter(talk = self, language__lang_amara_short = any_language)
+                # Set flag for big query, this means a subtitle is missing because it was recently new added
+                if my_subtitles.count() == 0:
+                    # Set the big update flag
+                    self.needs_complete_amara_update = True
+                elif my_subtitles.count() == 1:
+                    # Only proceed if the last activity has changed
+                    if my_subtitles[0].last_changed_on_amara < results[any_language]:
+                        my_subtitles[0].last_changed_on_amara = results[any_language]
+                        # Set the big update flag
+                        self.needs_complete_amara_update = True
+                        my_subtitles[0].save()
+                else:
+                    print("Something wrong with talk", self.id, self.title)
+            # Save the timestamp of the start of the function as last checked activity on amara timestamp
+            self.amara_activity_last_checked = start_timestamp
+            self.save()   
 
     # Check amara video-data
     def check_amara_video_data(self, force = False):
+        # TODO
+        # First get start-timestamp
         pass
 
 
@@ -592,6 +654,7 @@ class Subtitle(BasisModell):
         # Only if not blacklisted and complete
         if self.force or (not self.blacklisted and self.complete):
             # Sync file into the cdn..
+            # TODO
             self.needs_sync_to_ftp = False
             self.save()
             return True
@@ -608,6 +671,7 @@ class Subtitle(BasisModell):
             if self.needs_removal_from_media:
                 self.remove_from_media()
             # Remove file from cdn..
+            # TODO
             self.needs_removal_from_ftp = False
             self.save()
             return True
@@ -623,6 +687,7 @@ class Subtitle(BasisModell):
             if self.needs_sync_to_ftp:
                 self.sync_to_ftp()
             # do upload stuff
+            # TODO
             self.needs_sync_to_media = False
             self.save()
             return True
@@ -636,6 +701,7 @@ class Subtitle(BasisModell):
     def remove_from_media(self, force = False):
         if force or not self.complete:
             # Remove file from media frontend..
+            # TODO
             self.needs_removal_from_media = False
             self.save()
             return True
@@ -647,6 +713,7 @@ class Subtitle(BasisModell):
         # Only if not blacklisted and complete
         if self.force or (not self.blacklisted and self.complete):
             # Upload file to Youtube and make visible
+            # TODO
             self.needs_sync_to_YT = False
             self.save()
             return True
@@ -659,6 +726,7 @@ class Subtitle(BasisModell):
     def remove_from_YT(self, force = False):
         if force or not self.complete:
             # Remove file from YT..
+            # TODO
             self.needs_removal_from_YT = False
             self.save()
             return True
@@ -741,11 +809,13 @@ class Subtitle(BasisModell):
     # Tweet a completed Subtitle
     def tweet_complete(self):
         # Only if all (only cdn?) sync-flags are gone and tweet flag is set
+        # TODO
         pass
 
     # Tweet a Subtitle which is now ready for quality control
     def tweet_needs_quality_control(self):
         # Only if tweet_autosync_done is set
+        # TODO
         pass
 
     # Return the transcript file with amara fails fixed
