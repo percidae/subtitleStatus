@@ -311,6 +311,7 @@ class Talk(BasisModell):
     amara_update_interval = models.TimeField(default = "00:10", blank = True) # How often is activity checked?
     amara_complete_update_last_checked = models.DateTimeField(default = datetime.min, blank = True) # Everything checked, activity and data of every single subtitle
     needs_complete_amara_update = models.BooleanField(default = False)
+    next_amara_activity_check = models.DateTimeField(default = datetime.min, blank = True)
 
     # Recalculate statistics data over the whole talk
     @transaction.atomic
@@ -529,7 +530,7 @@ class Talk(BasisModell):
         # Take the timestamp for "last executed at" at the beginning of the function
         start_timestamp = datetime.now(timezone.utc)
         # Only proceed if forced or if the time delta for another query has passed
-        if force or (start_timestamp > self.amara_activity_last_checked + self.time_delta):
+        if force or (start_timestamp > self.next_amara_activity_check):
             import requests
             # Only check for new versions. New urls or other stuff is not interesting
             # Check for changes after the last check
@@ -553,11 +554,11 @@ class Talk(BasisModell):
                     # Amara Timestamps are all in utc, they just don't know yet, so they need to be force told
                     timestamp = timestamp.replace(tzinfo = timezone.utc)
                     # Add the new key to the dictionary and only at insert set the timestamp
-                    if language not in results:
-                        results[language] = timestamp
+                    results.setdefault(language, timestamp)
                     # Keep the newest timestamp over all api queries
-                    elif results[language] < timestamp:
+                    if results[language] < timestamp:
                         results[language] = timestamp
+            #print(results)
             # check if subtitles are present and need new data..
             for any_language in results.keys():
                 my_subtitles = Subtitle.objects.filter(talk = self, language__lang_amara_short = any_language)
@@ -567,15 +568,18 @@ class Talk(BasisModell):
                     self.needs_complete_amara_update = True
                 elif my_subtitles.count() == 1:
                     # Only proceed if the last activity has changed
-                    if my_subtitles[0].last_changed_on_amara < results[any_language]:
-                        my_subtitles[0].last_changed_on_amara = results[any_language]
+                    # The copy is a dirty workaround because saving in my_subtitles[0] did not work!
+                    my_subtitle = my_subtitles[0]
+                    if my_subtitle.last_changed_on_amara < results[any_language]:
+                        my_subtitle.last_changed_on_amara = results[any_language]
                         # Set the big update flag
                         self.needs_complete_amara_update = True
-                        my_subtitles[0].save()
+                        my_subtitle.save()
                 else:
                     print("Something wrong with talk", self.id, self.title)
             # Save the timestamp of the start of the function as last checked activity on amara timestamp
             self.amara_activity_last_checked = start_timestamp
+            self.next_amara_activity_check = start_timestamp + self.time_delta
             self.save()   
 
     # Check amara video-data
