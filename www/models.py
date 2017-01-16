@@ -534,8 +534,12 @@ class Talk(BasisModell):
             import requests
             # Only check for new versions. New urls or other stuff is not interesting
             # Check for changes after the last check
-            parameters = {'type': 'version-added',
-                'after': self.amara_activity_last_checked}
+            # If the check is forced, do not care about the last time the activity was checked
+            if force:
+                parameters = {'type': 'version-added'}
+            else:
+                parameters = {'type': 'version-added',
+                    'after': self.amara_activity_last_checked}
             basis_url = "https://amara.org/api/videos/"
             url = basis_url + self.amara_key + "/activity/"
             results = {}
@@ -558,7 +562,7 @@ class Talk(BasisModell):
                     # Keep the newest timestamp over all api queries
                     if results[language] < timestamp:
                         results[language] = timestamp
-            print(results)
+            #print(results)
             # check if subtitles are present and need new data..
             for any_language in results.keys():
                 my_subtitles = Subtitle.objects.filter(talk = self, language__lang_amara_short = any_language)
@@ -568,6 +572,7 @@ class Talk(BasisModell):
                     self.needs_complete_amara_update = True
                     my_language = Language.objects.get(lang_amara_short = any_language)
                     my_subtitle, created = Subtitle.objects.get_or_create(talk = self, language = my_language, last_changed_on_amara = results[any_language])
+                    print("Talk id: ",self.id, "Subtitle id: ", my_subtitle.id, " new created ", last_changed_on_amara  )
                 elif my_subtitles.count() == 1:
                     # Only proceed if the last activity has changed
                     # The copy is a dirty workaround because saving in my_subtitles[0] did not work!
@@ -577,6 +582,7 @@ class Talk(BasisModell):
                         # Set the big update flag
                         self.needs_complete_amara_update = True
                         my_subtitle.save()
+                        print("Talk id: ",self.id, "Subtitle id: ", my_subtitle.id, " new last changes:  ", last_changed_on_amara  )
                 else:
                     print("Something wrong with talk", self.id, self.title)
             # Save the timestamp of the start of the function as last checked activity on amara timestamp
