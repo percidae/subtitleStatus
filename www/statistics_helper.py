@@ -1,4 +1,4 @@
-﻿#!/usr/bin/python3
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 
 #==============================================================================
@@ -352,3 +352,4 @@ def n_most_common_words(word_frequencies, as_json = False):
         return json.dumps(return_dict, ensure_ascii = False)
     else:
         return return_dict
+
