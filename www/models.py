@@ -558,7 +558,7 @@ class Talk(BasisModell):
                     # Keep the newest timestamp over all api queries
                     if results[language] < timestamp:
                         results[language] = timestamp
-            #print(results)
+            print(results)
             # check if subtitles are present and need new data..
             for any_language in results.keys():
                 my_subtitles = Subtitle.objects.filter(talk = self, language__lang_amara_short = any_language)
@@ -566,6 +566,8 @@ class Talk(BasisModell):
                 if my_subtitles.count() == 0:
                     # Set the big update flag
                     self.needs_complete_amara_update = True
+                    my_language = Language.objects.get(lang_amara_short = any_language)
+                    my_subtitle, created = Subtitle.objects.get_or_create(talk = self, language = my_language, last_changed_on_amara = results[any_language])
                 elif my_subtitles.count() == 1:
                     # Only proceed if the last activity has changed
                     # The copy is a dirty workaround because saving in my_subtitles[0] did not work!
@@ -584,9 +586,87 @@ class Talk(BasisModell):
 
     # Check amara video-data
     def check_amara_video_data(self, force = False):
-        # TODO
-        # First get start-timestamp
-        pass
+        start_timestamp = datetime.now(timezone.utc)
+        # Only query amara if forced or flag is set
+        if force or self.needs_complete_amara_update:
+            url = "https://amara.org/api/videos/" + self.amara_key + "/languages/?format=json"
+            import requests
+            r = requests.get(url, headers = cred.AMARA_HEADER)
+            activities = json.loads(r.text)
+            for any_subtitle in activities["objects"]:
+                print("Talk_ID:", self.id, "Amara_key:", self.amara_key)
+                print("Language_code:", any_subtitle["language_code"])
+                amara_subt_lang = any_subtitle["language_code"]
+                print("is_primary_audio_language = is_original:", any_subtitle["is_primary_audio_language"])
+                amara_subt_is_original = any_subtitle["is_primary_audio_language"]
+                print("subtitles_complete:", any_subtitle["subtitles_complete"])
+                amara_subt_is_complete = any_subtitle["subtitles_complete"]
+                print("versions:", len(any_subtitle["versions"]))
+                amara_subt_revision = len(any_subtitle["versions"])
+                print("\n")
+                # Only proceed if the revision on amara is higher than zero
+                # Zero can exist if someone once clicked a language but didn't save anything
+                if amara_subt_revision > 0:
+                    # Get the right subtitle dataset or create it, only if the version is not null
+                    my_language = Language.objects.get(lang_amara_short = amara_subt_lang)     
+                    my_subtitle, created = Subtitle.objects.get_or_create(talk = self, language = my_language)
+                    # Proceed if the version on amara has changed
+                    if my_subtitle.revision != amara_subt_revision:
+                        # If the subtitle was not complete and is not complete
+                        if not my_subtitle.complete and not amara_subt_is_complete:
+                            # Just update the data
+                            my_subtitle.is_original_lang = amara_subt_is_original
+                            my_subtitle.revision = amara_subt_revision
+                            my_subtitle.save()
+                        # If the subtitle was not complete but is complete now
+                        elif not my_subtitle.complete and amara_subt_is_complete:
+                            my_subtitle.complete = amara_subt_is_complete
+                            my_subtitle.is_orignal_lang = amara_subt_is_original
+                            my_subtitle.revision = amara_subt_revision
+                            # This sets the sync flags and the tweet-flag
+                            my_subtitle.set_complete(was_already_complete = False)
+                            # If the talk also is in the original language, recalculate statistics
+                            if my_subtitle.is_original_lang:
+                                my_subtitle.talk.reset_related_statistics_data()
+                            my_subtitle.save()
+                        # If the subtitle was complete and is still complete
+                        elif my_subtitle.complete and amara_subt_is_complete:
+                            my_subtitle.complete = amara_subt_is_complete
+                            my_subtitle.is_orignal_lang = amara_subt_is_original
+                            my_subtitle.revision = amara_subt_revision
+                            # This sets the sync flags and the tweet-flag
+                            my_subtitle.set_complete(was_already_complete = True)
+                            # If the talk also is in the original language, recalculate statistics
+                            if my_subtitle.is_original_lang:
+                                my_subtitle.talk.reset_related_statistics_data()
+                            my_subtitle.save()
+                        # If the subtitle was complete but isn't any more
+                        elif my_subtitle.complete and not amara_subt_is_complete:
+                            my_subtitle.complete = amara_subt_is_complete
+                            my_subtitle.is_orignal_lang = amara_subt_is_original
+                            my_subtitle.revision = amara_subt_revision
+                            my_subtitle.reset_from_complete()
+                            # If the talk also is in the original language, recalculate statistics
+                            if my_subtitle.is_original_lang:
+                                my_subtitle.talk.reset_related_statistics_data(hard_reset = True)
+                            my_subtitle.save()
+
+                    # If the revision hasn't changed but the complete flag has changed, set the subtitle complete
+                    elif my_subtitle.complete and not amara_subt_is_complete:
+                        my_subtitle.set_complete()
+                        if my_subtitle.is_original_lang:
+                            my_subtitle.talk.reset_related_statistics_data()
+                    # Set the right state if the default is still active on "1"
+                    if my_subtitle.state_id == 1 and my_subtitle.is_original_lang:
+                        my_subtitle.state_id = 2
+                        my_subtitle.save()
+                    elif my_subtitle.state_id == 1 and not my_subtitle.is_original_lang:
+                        my_subtitle.state_id = 11
+                        my_subtitle.save() 
+            # Save the timestamp when this function was last used and reset the flag
+            self.amara_complete_update_last_checked = start_timestamp
+            self.needs_complete_amara_update = False
+            self.save()
 
     # Reset statistics data related to this talk
     # Is used for a original_subtitle update
@@ -654,7 +734,7 @@ class Subtitle(BasisModell):
     needs_removal_from_YT = models.BooleanField(default = False)
     tweet_autosync_done = models.BooleanField(default = False)
     #comment = models.TextField(default = "")
-    last_changed_on_amara = models.DateTimeField(default = datetime.min, blank = True)
+    last_changed_on_amara = models.DateTimeField(default = "1970-01-01 00:00:00+00:00", blank = True)
     yt_caption_id = models.CharField(max_length = 50, default = "", blank = True)
     needs_sync_to_media = models.BooleanField(default = False)
     needs_removal_from_media = models.BooleanField(default = False)
