@@ -518,7 +518,7 @@ class Talk(BasisModell):
 
     # Create a timedelta of the amara_update_interval, for much easier use
     @property
-    def time_delta(self):
+    def calculated_time_delta_for_activities(self):
         return timedelta(seconds = self.amara_update_interval.second,
             minutes = self.amara_update_interval.minute,
             hours = self.amara_update_interval.hour,
@@ -579,7 +579,7 @@ class Talk(BasisModell):
                     print("Something wrong with talk", self.id, self.title)
             # Save the timestamp of the start of the function as last checked activity on amara timestamp
             self.amara_activity_last_checked = start_timestamp
-            self.next_amara_activity_check = start_timestamp + self.time_delta
+            self.next_amara_activity_check = start_timestamp + self.calculated_time_delta_for_activities
             self.save()   
 
     # Check amara video-data
@@ -587,6 +587,42 @@ class Talk(BasisModell):
         # TODO
         # First get start-timestamp
         pass
+
+    # Reset statistics data related to this talk
+    # Is used for a original_subtitle update
+    # use hard_reset = True if a subtitle is reset from complete to not complete any more
+    @transaction.atomic
+    def reset_related_statistics_data(self, hard_reset = False):
+        # Set the recalculate flags no matter if hard_reset or not
+        self.recalculate_talk_statistics = True
+        self.recalculate_speakers_statistics = True
+        if hard_reset:
+            # Reset everything of the talk and directly related to the talk
+            self.average_spm = None
+            self.average_wpm = None
+            self.strokes = None 
+            self.words = None
+            self.time_delta = None
+            self.speakers_average_spm = None
+            self.speakers_average_wpm = None
+            self.n_most_frequent_words = "{}"
+            self.n_most_frequent_words_speakers = "{}"
+            Statistics_Raw_Data.objects.filter(talk = self).update(recalculate_statistics = True,
+                time_delta = None,
+                words = None,
+                strokes = None)
+            Talk_Persons.objects.filter(talk = self).update(recalculate_statistics = True,
+                average_spm = None,
+                average_wpm = None,
+                words = None,
+                strokes = None,
+                time_delta = None,
+                n_most_frequent_words = "{}")
+        # If no hard_reset only also set the Statistics_Raw_Data to recalculate and the Talk_Persons Data
+        else:
+            Statistics_Raw_Data.objects.filter(talk = self).update(recalculate_statistics = True)
+            Talk_Persons.objects.filter(talk = self).update(recalculate_statistics = True)
+        self.save()
 
 
 # States for every subtitle like "complete" or "needs sync"
@@ -951,7 +987,7 @@ class Statistics_Raw_Data(BasisModell):
                 Talk_Persons.objects.filter(talk = self.talk, speaker = self.speaker).update(recalculate_statistics = True)
                 # Set recalculate flag in the connected Statistics_Speaker module and also create the database entry
                 # Get or create the related Statistics_Speaker database entry.
-                # The necessary language is not the language of the talk but the language of the related is_orignal subtitle!
+                # The necessary language is not the language of the talk but the language of the related is_original subtitle!
                 this_speaker, created = Statistics_Speaker.objects.get_or_create(speaker = self.speaker, language = self.talk.language_of_original_subtitle)
                 this_speaker.recalculate_statistics = True
                 this_speaker.save()
