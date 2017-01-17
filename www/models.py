@@ -572,7 +572,7 @@ class Talk(BasisModell):
                     self.needs_complete_amara_update = True
                     my_language = Language.objects.get(lang_amara_short = any_language)
                     my_subtitle, created = Subtitle.objects.get_or_create(talk = self, language = my_language, last_changed_on_amara = results[any_language])
-                    print("Talk id: ",self.id, "Subtitle id: ", my_subtitle.id, " new created ", last_changed_on_amara  )
+                    print("Talk id: ",self.id, "Subtitle id: ", my_subtitle.id, " new created ", my_subtitle.last_changed_on_amara  )
                 elif my_subtitles.count() == 1:
                     # Only proceed if the last activity has changed
                     # The copy is a dirty workaround because saving in my_subtitles[0] did not work!
@@ -582,7 +582,7 @@ class Talk(BasisModell):
                         # Set the big update flag
                         self.needs_complete_amara_update = True
                         my_subtitle.save()
-                        print("Talk id: ",self.id, "Subtitle id: ", my_subtitle.id, " new last changes:  ", last_changed_on_amara  )
+                        print("Talk id: ",self.id, "Subtitle id: ", my_subtitle.id, " new last changes:  ", my_subtitle.last_changed_on_amara  )
                 else:
                     print("Something wrong with talk", self.id, self.title)
             # Save the timestamp of the start of the function as last checked activity on amara timestamp
