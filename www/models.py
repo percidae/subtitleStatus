@@ -710,6 +710,61 @@ class Talk(BasisModell):
             Talk_Persons.objects.filter(talk = self).update(recalculate_statistics = True)
         self.save()
 
+    # Fill the filename column for the subtitles root folder in the cdn
+    @transaction.atomic
+    def fill_filename_field(self, force = False):
+        # Only proceed if the filename column is empty or forced and the talk must not be blacklisted
+        if (self.filename == "" or force) and not self.blacklisted:
+            # Prepare the sftp connection
+            import pysftp
+            USER = cred.SFTP_USER
+            HOST = cred.SFTP_HOST
+            PRIV_KEY = cred.SFTP_PRIV_KEY
+            # Access sftp server
+            sftp = pysftp.Connection(username = USER, host = HOST, private_key = PRIV_KEY)
+            event_subfolder = self.event.ftp_startfolder + "/" + self.event.subfolder_to_find_the_filenames
+            # "Save" offset directory
+            with sftp.cd():
+                sftp.chdir(event_subfolder)
+                subfolder_file_list = sftp.listdir()
+                # Get frab id for the regex as string and compile the regex pattern
+                frab_id = str(self.frab_id_talk)
+                pattern = "(?P<filename>^\S*-"+frab_id+"\S*[.])(?P<extension>\S*)"
+                reg_pattern = re.compile(pattern)
+                # Check every filename in the results and save all results to an array
+                file_name_results = []
+                for every_filename in subfolder_file_list:
+                    # do regex-stuff
+                    result = reg_pattern.match(every_filename)
+                    # Only proceed if the right filename was found
+                    if (result != None):
+                        # If fits, cut to limits
+                        new_pattern = "(?P<filename>^\S*)\..*"
+                        new_reg_pattern = re.compile(new_pattern)
+                        new_result = new_reg_pattern.match(every_filename).groups()[0]
+                        file_name_results.append(str(new_result))
+            # Close sftp connection
+            sftp.close()
+            self.filename = ""
+            for any_filename in file_name_results:
+                # Workaround if the filename ends in _hd
+                if any_filename[-3:] == "_hd":
+                    any_filename = any_filename[:-3]
+                # Workaround if the filename ends in _sd
+                if any_filename[-3:] == "_sd":
+                    any_filename = any_filename[:-3]
+                # Workaround if the filename ends in _webm-hd
+                if any_filename[-8:] == "_webm-hd":
+                    any_filename = any_filename[:-8]
+                # Workaround if the filename ends in _webm-sd
+                if any_filename[-8:] == "_webm-sd":
+                    any_filename = any_filename[:-8]
+                # Use the longest filename
+                if len(self.filename) < len(any_filename):
+                    self.filename = any_filename
+            #print("Result: ", self.filename)
+            self.save()
+
 
 # States for every subtitle like "complete" or "needs sync"
 class States(BasisModell):
