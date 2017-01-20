@@ -591,6 +591,7 @@ class Talk(BasisModell):
             self.save()   
 
     # Check amara video-data
+    @transaction.atomic
     def check_amara_video_data(self, force = False):
         start_timestamp = datetime.now(timezone.utc)
         # Only query amara if forced or flag is set
