@@ -745,6 +745,7 @@ class Subtitle(BasisModell):
     needs_sync_to_media = models.BooleanField(default = False)
     needs_removal_from_media = models.BooleanField(default = False)
     blacklisted = models.BooleanField(default = False) # If syncs to the cdn, and media or YT should be blocked
+    media_id = models.CharField(max_length = 6, default = "", blank = True)
 
 
     def _still_in_progress(self, timestamp, state, original_language=True):
@@ -778,7 +779,7 @@ class Subtitle(BasisModell):
     # Sync Subtitle File to the cdn
     def sync_to_ftp(self, force = False):
         # Only if not blacklisted and complete
-        if self.force or (not self.blacklisted and self.complete):
+        if force or (not self.blacklisted and self.complete):
             # Sync file into the cdn..
             # TODO
             self.needs_sync_to_ftp = False
@@ -806,14 +807,25 @@ class Subtitle(BasisModell):
 
     # Sync Subtitle File to the media frontend
     # Only use _after_ file has been synced to the cdn
+    @transaction.atomic
     def sync_to_media(self, force = False):
         # Only if not blacklisted and complete
-        if self.force or (not self.blacklisted and self.complete):
+        if force or (not self.blacklisted and self.complete):
             # Only if the file is already in the cdn
             if self.needs_sync_to_ftp:
                 self.sync_to_ftp()
-            # do upload stuff
-            # TODO
+            # Only proceed if the file is not already linked in media and the language exists in media
+            if self.media_id == "" and self.language.lang_code_media != "-":
+                import requests
+                headers = {'CONTENT-TYPE': 'application/json'}
+                data = '{"api_key": "%s", "guid": "%s", "recording":{"filename": "%s.%s.srt", "language": "%s", "mime_type":"application/x-subrip", "length":"3600", "folder":"subtitles" }}' % (cred.MEDIA_API_KEY, self.talk.guid, self.talk.filename, self.language.lang_short_srt, self.language.lang_code_media)
+                r = requests.post("https://media.ccc.de/api/recordings/", headers = headers, data = data)
+                answer = json.loads(r.text)
+                print(answer)
+                # Save the id the "recording" has in media for later delete
+                if "id" in answer.keys():
+                    self.media_id = answer["id"]
+                    print(self.media_id)
             self.needs_sync_to_media = False
             self.save()
             return True
@@ -825,10 +837,18 @@ class Subtitle(BasisModell):
     # Remove Subtitle File from the media frontend
     # Use _before_ file is removed from the cdn
     def remove_from_media(self, force = False):
-        if force or not self.complete:
-            # Remove file from media frontend..
-            # TODO
+        if force or self.needs_removal_from_media:
+            # Proceed only if there was already a sync to media
+            if self.media_id != "":
+                import requests
+                headers = {'CONTENT-TYPE': 'application/json'}
+                data = '{"api_key": "%s"}' % (cred.MEDIA_API_KEY)
+                url = "https://media.ccc.de/api/recordings/" + self.media_id
+                r = requests.delete(url, headers = headers, data = data)
+                #print(r.text)
+                print(r)
             self.needs_removal_from_media = False
+            self.media_id = ""
             self.save()
             return True
         if self.complete:
