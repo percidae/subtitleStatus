@@ -674,6 +674,43 @@ class Talk(BasisModell):
             self.needs_complete_amara_update = False
             self.save()
 
+    # Check the recording ids of subtitles on the media frontend
+    @transaction.atomic
+    def check_media_recording_ids(self, force = False):
+        # Check if the talk has subtitles and get them
+        my_subtitles = Subtitle.objects.filter(talk = self)
+        # Stop if there are no related subtitles to this talk
+        if my_subtitles.count() == 0:
+            return None
+        import requests
+        basis_url = "https://api.media.ccc.de/public/events/"
+        url = basis_url + self.guid
+        r = requests.get(url)
+        media_recordings = json.loads(r.text)
+        # If the api returns nothing senseful because the guid is wrong or for other reasons
+        if "message" in media_recordings:
+            print("No recordings on media for this talk: ", self.id, self.title)
+            return None
+        subtitle_recordings = {}
+        for any_recording in media_recordings["recordings"]:
+            # Only recordings which are subtitles are interesting
+            if any_recording["mime_type"] == "application/x-subrip":
+                subtitle_recordings[any_recording["language"]] = any_recording["url"]
+        # Shrink the url to only the recordings id
+        for any_media_language in subtitle_recordings:
+            slice_begin = -1
+            while subtitle_recordings[any_media_language][slice_begin:slice_begin + 1] != "/":
+                slice_begin -= 1
+            subtitle_recordings[any_media_language] = subtitle_recordings[any_media_language][slice_begin + 1:]
+        print(subtitle_recordings)
+        # Check for every subtitle of this talk if it is in the result from media else set the string for media_id empty
+        for any_subtitle in my_subtitles:
+            if any_subtitle.language.lang_code_media in subtitle_recordings:
+                any_subtitle.media_id = subtitle_recordings[any_subtitle.language.lang_code_media]
+            else:
+                any_subtitle.media_id = ""
+            any_subtitle.save()
+
     # Reset statistics data related to this talk
     # Is used for a original_subtitle update
     # use hard_reset = True if a subtitle is reset from complete to not complete any more
